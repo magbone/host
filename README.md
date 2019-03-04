@@ -1,2 +1,14 @@
 # host
-The DNS protocol search the domain resolve result
+## Preface
+The DNS protocol searchs the domain resolve result.
+
+## Usage
+
+```bash
+host [domai]
+
+```
+
+## License
+
+MIT License
