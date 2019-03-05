@@ -138,7 +138,16 @@ void host_query_udp(char *buffer, size_t buffer_size)
                   printf("time out\n");
             }
       }
-      
+
+      host_reply_unpack(recv_msg, ret);
+      if((ret = recvfrom(sockfd, recv_msg, BUFFER_SIZE, 0,(struct sockaddr*) &addr,(socklen_t *)&addr_len)) < 0)
+      {
+            perror("Error");
+            if(ret == EWOULDBLOCK || ret == EAGAIN)
+            {
+                  printf("time out\n");
+            }
+      }
 
       host_reply_unpack(recv_msg, ret);
       close(sockfd);
@@ -177,6 +186,7 @@ void host_reply_unpack(char *buffer, int buffer_size)
             strcat(name, ".");
       }
       printf("%s\n",name);
+      printf("NameServer: %s#53\n", NAME_SERVER_0);
       host_domain_name_index_add(ip, name_index, name);
       index+=4;
 
@@ -191,25 +201,58 @@ void host_reply_unpack(char *buffer, int buffer_size)
             u_int16_t class = first_octets + (buffer[index++] & 0x00ff);
             u_int16_t ttl = ((buffer[index] << 24) & 0xff000000)  + ((buffer[index + 1] << 16) & 0x00ff0000)+ ((buffer[index + 2] << 8) & 0x0000ff00)+ (buffer[index + 3] & 0x000000ff);
             index+=4;
+
             first_octets = (buffer[index++] <<8) & 0xff00;
             u_int16_t length = first_octets + (buffer[index++] & 0x00ff);
-
-            u_int8_t address[length];
-            for(int j = 0; j < length; j++)
+            switch(type)
             {
-                 address[j] = (u_int8_t)buffer[index++]; 
+                  case A:
+                  {
+                        
+                        u_int8_t address[length];
+                        for(int j = 0; j < length; j++)
+                        {
+                        address[j] = (u_int8_t)buffer[index++]; 
+                        }
+                        char *rel_name;
+                        host_domain_name_index_get(ip, an_name, &rel_name);
+                        printf("\n");
+                        printf("Name: %s\n", rel_name);
+      
+                        printf("Type: A\n");
+                        //free(type_name);
+                        printf("Class: %s\n", GET_CLASS(class));
+                        printf("TTL: %d\n", ttl);
+                        printf("Address: %d.%d.%d.%d\n\n", address[0], address[1], address[2], address[3]);
+                        break;
+                  }
+                  case CNAME:
+                  {
+                        char *rel_name;
+                        host_domain_name_index_get(ip, an_name, &rel_name);
+                        printf("\n");
+                        printf("Name: %s\n", rel_name);
+                        printf("Type: CNAME\n");
+                        printf("Class: %s\n", GET_CLASS(class));
+                        printf("TTL: %d\n", ttl);
+                        memset(name, 0, 256);
+                        while((buffer[index++] & 0xff ) != 0x00)
+                        {
+                              int len = buffer[--index] & 0xff;
+                              index++;
+                              for(int i = 0; i < len; i++)
+                              {     
+                                    char sub_domain[1] = {buffer[index++]};
+                                    strcat(name, sub_domain);
+                              }
+                              strcat(name, ".");
+                        }
+                        printf("CNAME: %s\n", name);
+                        break;
+                  }
+                  
             }
-            char *rel_name;
-            host_domain_name_index_get(ip, an_name, &rel_name);
-            printf("\n\n");
-            printf("Name: %s\n", rel_name);
-            char *type_name;
-            GET_TYPE(type, &type_name);
-            printf("Type: %s\n", type_name);
-            //free(type_name);
-            printf("Class: %s\n", GET_CLASS(class));
-            printf("TTL: %d\n", ttl);
-            printf("Address: %d.%d.%d.%d\n", address[0], address[1], address[2], address[3]);
+           
       }
 
 }

@@ -38,46 +38,6 @@
 
 #define GET_CLASS(x) (x == 0x0001 ? "IN" : "NULL")
 
-#define GET_TYPE(t ,type) \
-      do {  \
-      switch(t){ \
-      case A: \
-      *type = "A"; break;\
-      case NS: \
-      *type = "NS"; break;\
-      case MD: \
-      *type = "MD"; break;\
-      case MF: \
-      *type = "MF"; break;\
-      case CNAME: \
-      *type = "CNAME"; break;\
-      case SOA: \
-      *type = "SOA"; break;\
-      case MB: \
-      *type = "MB"; break;\
-      case MG: \
-      *type = "MG"; break;\
-      case MR: \
-      *type = "MR"; break;\
-      case _NULL: \
-      *type = "NULL"; break;\
-      case WKS: \
-      *type = "WKS"; break;\
-      case PTR:\
-      *type = "PTR"; break;\
-      case HINFO:\
-      *type = "HINFO"; break;\
-      case MINFO:\
-      *type = "MINFO"; break;\
-      case MX:\
-      *type = "MX"; break;\
-      case TXT:\
-      *type = "TXT"; break;\
-      default:\
-      *type = "NO SUCH TYPE"; }\
-      }while(0)
-
-
 struct host_header
 {
       u_int16_t id;
