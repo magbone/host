@@ -18,6 +18,7 @@
 #define NAME_SERVER_0 "114.114.114.114"
 #define PORT 53
 #define BUFFER_SIZE 1024
+#define MAX_DOMAIN_LEN 256
 
 #define A  1
 #define NS 2
@@ -37,6 +38,7 @@
 #define TXT 16
 
 #define GET_CLASS(x) (x == 0x0001 ? "IN" : "NULL")
+
 
 struct host_header
 {
@@ -120,4 +122,4 @@ void host_query_udp(char *buffer, size_t buffer_size);
 
 void host_reply_unpack(char *buffer, int buffer_size);
 
-
+char* host_domain_strcat(char buffer[][MAX_DOMAIN_LEN], int buffer_size);

@@ -172,22 +172,30 @@ void host_reply_unpack(char *buffer, int buffer_size)
       host_domain_name_index_new(&ip);
       //query 
       printf("Name: ");
-      char name[256] = {0};
+      char name[MAX_DOMAIN_LEN][MAX_DOMAIN_LEN];
       int name_index = index; 
+      int name_t = 0;
       while((buffer[index++] & 0xff ) != 0x00)
       {
             int len = buffer[--index] & 0xff;
+            int this_index = index;
+            char sub_domain[len + 1];
+            memset(sub_domain, 0, len + 1);
             index++;
             for(int i = 0; i < len; i++)
             {     
-                  char sub_domain[1] = {buffer[index++]};
-                  strcat(name, sub_domain);
+                  sub_domain[i] = buffer[index++];
             }
-            strcat(name, ".");
+            char* name_temp = name[name_t++];
+            strcpy(name_temp, sub_domain);
+            if(name_t > 1)
+            host_domain_name_index_add(ip, this_index, name_temp);
       }
-      printf("%s\n",name);
+
+      char *domain_name = host_domain_strcat(name, name_t);
+      printf("%s\n", domain_name);
       printf("NameServer: %s#53\n", NAME_SERVER_0);
-      host_domain_name_index_add(ip, name_index, name);
+      host_domain_name_index_add(ip, name_index, domain_name);
       index+=4;
 
       //answers
@@ -212,7 +220,7 @@ void host_reply_unpack(char *buffer, int buffer_size)
                         u_int8_t address[length];
                         for(int j = 0; j < length; j++)
                         {
-                        address[j] = (u_int8_t)buffer[index++]; 
+                              address[j] = (u_int8_t)buffer[index++]; 
                         }
                         char *rel_name;
                         host_domain_name_index_get(ip, an_name, &rel_name);
@@ -235,19 +243,16 @@ void host_reply_unpack(char *buffer, int buffer_size)
                         printf("Type: CNAME\n");
                         printf("Class: %s\n", GET_CLASS(class));
                         printf("TTL: %d\n", ttl);
-                        memset(name, 0, 256);
-                        while((buffer[index++] & 0xff ) != 0x00)
+                        
+                        for(int i = 0;i < length; i++)
                         {
-                              int len = buffer[--index] & 0xff;
-                              index++;
-                              for(int i = 0; i < len; i++)
-                              {     
-                                    char sub_domain[1] = {buffer[index++]};
-                                    strcat(name, sub_domain);
+                              int length = buffer[index++];
+                              for(int j = 0;j < length && j < length;j++)
+                              {
+                                    
                               }
-                              strcat(name, ".");
                         }
-                        printf("CNAME: %s\n", name);
+                        printf("CNAME: %s\n", domain_name);
                         break;
                   }
                   
@@ -307,4 +312,26 @@ void host_domain_name_index_get(host_domain_name_index_t *ip, int index, char **
       
             ip_tmp = ip_tmp->next;
       }
+}
+/**
+ * let the string[subdomain] array combine to compete domain
+ * 
+ * like this:     @param *buffer -> ["www", "example", "com"]
+ *                @param buffer_size the buffer length;
+ *                @return char* -> ["www.example.com"]
+ **/
+char* host_domain_strcat(char buffer[][MAX_DOMAIN_LEN], int buffer_size)
+{
+      char *domain_p;
+      if((domain_p = (char *)malloc(sizeof(char) * MAX_DOMAIN_LEN)) == NULL)
+      {
+            printf("Error: Init failed\n");
+            exit(0);
+      }
+      for(int i = 0;i < buffer_size;i++)
+      {
+            strcat(domain_p, buffer[i]);
+            if((i + 1) < buffer_size) strcat(domain_p, ".");
+      }
+      return domain_p;
 }
