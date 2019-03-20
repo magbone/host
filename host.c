@@ -122,6 +122,17 @@ void host_query_udp(char *buffer, size_t buffer_size)
       memset(recv_msg, 0, BUFFER_SIZE);
       char *send_msg = buffer;
 
+      //time out setting. 3s 
+      struct timeval tv;
+      tv.tv_sec = 3;
+      tv.tv_usec = 0;
+      if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+      {
+            
+            close(sockfd);
+            exit(1);
+      }
+
       int ret;
       if(sendto(sockfd, send_msg, buffer_size, 0, (struct sockaddr*) &addr,addr_len) < 0)
       {
@@ -132,25 +143,21 @@ void host_query_udp(char *buffer, size_t buffer_size)
 
       if((ret = recvfrom(sockfd, recv_msg, BUFFER_SIZE, 0,(struct sockaddr*) &addr,(socklen_t *)&addr_len)) < 0)
       {
-            perror("Error");
-            if(ret == EWOULDBLOCK || ret == EAGAIN)
-            {
-                  printf("time out\n");
-            }
+            printf("Finished.\n");
+            goto Close; 
       }
 
       host_reply_unpack(recv_msg, ret);
       if((ret = recvfrom(sockfd, recv_msg, BUFFER_SIZE, 0,(struct sockaddr*) &addr,(socklen_t *)&addr_len)) < 0)
       {
-            perror("Error");
-            if(ret == EWOULDBLOCK || ret == EAGAIN)
-            {
-                  printf("time out\n");
-            }
+            printf("Finished.\n");
+            goto Close;
       }
 
       host_reply_unpack(recv_msg, ret);
+      Close:
       close(sockfd);
+      
 }
 
 void host_reply_unpack(char *buffer, int buffer_size)
@@ -173,7 +180,7 @@ void host_reply_unpack(char *buffer, int buffer_size)
       //query 
       printf("Name: ");
       char name[MAX_DOMAIN_LEN][MAX_DOMAIN_LEN];
-      int name_index = index; 
+      int name_index = index; // record the entire domain offset
       int name_t = 0;
       while((buffer[index++] & 0xff ) != 0x00)
       {
@@ -244,15 +251,33 @@ void host_reply_unpack(char *buffer, int buffer_size)
                         printf("Class: %s\n", GET_CLASS(class));
                         printf("TTL: %d\n", ttl);
                         
+                        int name_t = 0;
+                        char cname_name[MAX_DOMAIN_LEN][MAX_DOMAIN_LEN];
+                        
+                        int entire_index = index;
                         for(int i = 0;i < length; i++)
                         {
-                              int length = buffer[index++];
-                              for(int j = 0;j < length && j < length;j++)
-                              {
-                                    
+                              int cname_length = (u_int8_t)buffer[index++];
+                              int cname_index = index;
+                              char cname_sub_name[length + 1];
+                              memset(cname_sub_name, 0, length + 1);
+                              if(cname_length == 0xc0){
+                                    char *cname_sub_offset_name;
+                                    host_domain_name_index_get(ip, (u_int8_t)buffer[index++], &cname_sub_offset_name);
+                                    if(cname_sub_offset_name)
+                                    strcpy(cname_name[name_t++], cname_sub_offset_name);
+                                    index++;
+                                    break;
                               }
+                              for(int j = 0;j < cname_length;j++)
+                              {
+                                    cname_sub_name[j] = buffer[index++];
+                              }
+                              strcpy(cname_name[name_t++], cname_sub_name);
+                              if(i > 1) host_domain_name_index_add(ip, index, cname_sub_name);
                         }
-                        printf("CNAME: %s\n", domain_name);
+                        char *cname_domain = host_domain_strcat(cname_name, name_t);
+                        printf("CNAME: %s\n", cname_domain);
                         break;
                   }
                   
@@ -276,8 +301,7 @@ void host_domain_name_index_new(host_domain_name_index_t **ipp)
 
 void host_domain_name_index_add(host_domain_name_index_t *ip, int index, char *domain)
 {
-      host_domain_name_index_t *new_p;
-      new_p = (host_domain_name_index_t *)malloc(sizeof(host_domain_name_index_t));
+      host_domain_name_index_t *new_p = (host_domain_name_index_t *)malloc(sizeof(host_domain_name_index_t));
 
       if(new_p == NULL)
       {
@@ -291,9 +315,10 @@ void host_domain_name_index_add(host_domain_name_index_t *ip, int index, char *d
             if(index == ip_tmp->index) return;
             ip_tmp = ip_tmp->next;
       }
-
+      
       new_p->index = index;
       new_p->domain = domain;
+      new_p->next = NULL;
       ip_tmp->next = new_p;
 }
 
